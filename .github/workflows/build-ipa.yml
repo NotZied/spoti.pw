@@ -9,12 +9,15 @@ on:
         type: string
       upload_method:
         description: "Where to put the result"
-        default: artifacts
+        default: release
         type: choice
-        options: [artifacts, filebin, both]
+        options: [artifacts, filebin, release, all]
 
 env:
   THEOS: ${{ github.workspace }}/theos
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -48,14 +51,14 @@ jobs:
       - run: make release
 
       - uses: actions/upload-artifact@v5
-        if: inputs.upload_method != 'filebin'
+        if: inputs.upload_method == 'artifacts' || inputs.upload_method == 'all'
         with:
           name: spoti.ipa
           path: out/*.ipa
           if-no-files-found: error
 
       - name: Upload to filebin.net
-        if: inputs.upload_method != 'artifacts'
+        if: inputs.upload_method == 'filebin' || inputs.upload_method == 'all'
         run: |
           BIN="spotifyglass-${{ github.run_id }}"
           echo "### filebin.net download" >> "$GITHUB_STEP_SUMMARY"
@@ -64,3 +67,11 @@ jobs:
             echo "- https://filebin.net/$BIN/$(basename "$f")" >> "$GITHUB_STEP_SUMMARY"
           done
           echo "- _filebin deletes bins after a few days of inactivity, download promptly._" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create release with raw IPA
+        if: inputs.upload_method == 'release' || inputs.upload_method == 'all'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_id }}
+          name: "Spotify build ${{ github.run_id }}"
+          files: out/*.ipa
